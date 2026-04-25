@@ -229,6 +229,13 @@ class LegacyTextLocalizer {
     '已开启': 'Enabled',
     '去开启': 'Enable',
     '清除缓存': 'Clear cache',
+    '小万可以在陪伴时更了解您的喜好':
+        'Help Omnibot better understand your preferences during companion mode',
+    '小万可在屏幕中实时活动，随时给予陪伴':
+        'Allow Omnibot to stay active on screen and accompany you anytime',
+    '小万可以知道能帮你做什么事情': 'Let Omnibot know what it can help you with',
+    '小万执行任务时，需要给予我操作的权限':
+        'Omnibot needs permission to perform actions when executing tasks',
     '设置权限': 'Set up permissions',
     '请放心，这些权限你随时可以收回': 'You can revoke these permissions anytime',
     '查看并配置无障碍、悬浮窗、Shizuku 等权限':

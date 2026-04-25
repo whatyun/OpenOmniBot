@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_switch/flutter_switch.dart';
 import 'package:ui/l10n/l10n.dart';
-import 'package:ui/theme/app_colors.dart';
 import 'package:ui/services/special_permission.dart';
+import 'package:ui/theme/theme_context.dart';
 import 'package:ui/utils/cache_util.dart';
 import 'package:ui/widgets/common_app_bar.dart';
 
@@ -25,6 +25,16 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
   bool _installedAppsPermission = false;
   bool _accessibilityPermission = false;
   ShizukuStatusSnapshot _shizukuStatus = ShizukuStatusSnapshot.fallback();
+
+  bool get _isDarkTheme => context.isDarkTheme;
+  Color get _pageBackground => context.omniPalette.pageBackground;
+  Color get _cardColor => context.omniPalette.surfacePrimary;
+  Color get _cardBorderColor => context.omniPalette.borderSubtle;
+  Color get _titleColor => context.omniPalette.textPrimary;
+  Color get _subtitleColor => context.omniPalette.textSecondary;
+  Color get _tertiaryTextColor => context.omniPalette.textTertiary;
+  Color get _accentColor => context.omniPalette.accentPrimary;
+  Color get _switchInactiveColor => context.omniPalette.borderStrong;
 
   @override
   void initState() {
@@ -95,7 +105,7 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
+      backgroundColor: _pageBackground,
       appBar: CommonAppBar(
         title: context.l10n.authorizePageTitle,
         primary: true,
@@ -178,8 +188,8 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
                   isBottom: true,
                   trailingLabel: _shizukuStatus.localizedStatusLabel,
                   trailingLabelColor: _shizukuStatus.isGranted
-                      ? const Color(0xFF999999)
-                      : const Color(0xFF3B74FF),
+                      ? _tertiaryTextColor
+                      : _accentColor,
                   onTap: () async {
                     await ensureShizukuPermission(context);
                     if (mounted) {
@@ -213,15 +223,18 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
   Widget _buildSettingsCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(4),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 4,
-            spreadRadius: 2,
-          ),
-        ],
+        border: Border.all(color: _cardBorderColor),
+        boxShadow: _isDarkTheme
+            ? const []
+            : [
+                BoxShadow(
+                  color: context.omniPalette.shadowColor,
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(children: children),
     );
@@ -244,10 +257,10 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1F2336),
+                    color: _titleColor,
                     fontFamily: 'PingFang SC',
                   ),
                 ),
@@ -255,9 +268,9 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: Color(0xFF999999),
+                      color: _subtitleColor,
                       fontFamily: 'PingFang SC',
                     ),
                   ),
@@ -270,8 +283,8 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
             height: 18.67,
             toggleSize: 11.3,
             padding: 3,
-            activeColor: Color(0xFF202F51),
-            inactiveColor: AppColors.fillStandardSecondary,
+            activeColor: _accentColor,
+            inactiveColor: _switchInactiveColor,
             borderRadius: 28.75,
             value: value,
             onToggle: onChanged,
@@ -310,19 +323,19 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF1F2336),
+                        color: _titleColor,
                         fontFamily: 'PingFang SC',
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        color: Color(0xFF999999),
+                        color: _subtitleColor,
                         fontFamily: 'PingFang SC',
                       ),
                     ),
@@ -341,9 +354,7 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
                       fontSize: 12,
                       color:
                           trailingLabelColor ??
-                          (isEnabled
-                              ? const Color(0xFF999999)
-                              : const Color(0xFF3B74FF)),
+                          (isEnabled ? _tertiaryTextColor : _accentColor),
                       fontFamily: 'PingFang SC',
                     ),
                   ),
@@ -351,7 +362,7 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
                   Icon(
                     Icons.chevron_right,
                     size: 18,
-                    color: const Color(0xFF999999),
+                    color: _tertiaryTextColor,
                   ),
                 ],
               ),
@@ -383,10 +394,10 @@ class _AuthorizeSettingPageState extends State<AuthorizeSettingPage>
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF1F2336),
+                  color: _titleColor,
                   fontFamily: 'SF Pro',
                 ),
               ),
