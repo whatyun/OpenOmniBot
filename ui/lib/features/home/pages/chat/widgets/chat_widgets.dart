@@ -1438,6 +1438,9 @@ class _ChatMessageListState extends State<ChatMessageList> {
 
   @override
   Widget build(BuildContext context) {
+    final reservedBottomInset = widget.bottomOverlayInset
+        .clamp(0.0, double.infinity)
+        .toDouble();
     final pageBackgroundColor =
         !widget.appearanceConfig.isActive && context.isDarkTheme
         ? context.omniPalette.pageBackground
@@ -1445,30 +1448,22 @@ class _ChatMessageListState extends State<ChatMessageList> {
 
     final Widget content;
     if (widget.messages.isEmpty) {
-      final emptyStateBottomInset = widget.bottomOverlayInset
-          .clamp(0.0, double.infinity)
-          .toDouble();
       content = GestureDetector(
         onVerticalDragUpdate: (_) {},
         behavior: HitTestBehavior.opaque,
-        child: AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: EdgeInsets.only(bottom: emptyStateBottomInset),
-          child: Center(
-            child: Text(
-              Localizations.localeOf(context).languageCode == 'en'
-                  ? 'How can I help you?'
-                  : '有什么可以帮助你的？',
-              style: TextStyle(
-                color:
-                    !widget.appearanceConfig.isActive &&
-                        widget.appearanceConfig.chatTextColorMode !=
-                            AppBackgroundTextColorMode.custom
-                    ? context.omniPalette.textSecondary
-                    : widget.visualProfile.secondaryTextColor,
-                fontSize: 14,
-              ),
+        child: Center(
+          child: Text(
+            Localizations.localeOf(context).languageCode == 'en'
+                ? 'How can I help you?'
+                : '有什么可以帮助你的？',
+            style: TextStyle(
+              color:
+                  !widget.appearanceConfig.isActive &&
+                      widget.appearanceConfig.chatTextColorMode !=
+                          AppBackgroundTextColorMode.custom
+                  ? context.omniPalette.textSecondary
+                  : widget.visualProfile.secondaryTextColor,
+              fontSize: 14,
             ),
           ),
         ),
@@ -1492,11 +1487,7 @@ class _ChatMessageListState extends State<ChatMessageList> {
         itemBuilder: (context, index) {
           final dataIndex = messageSource.length - 1 - index;
           final message = messageSource[dataIndex];
-          final isNewestMessage = dataIndex == 0;
           final isOldestMessage = dataIndex == messageSource.length - 1;
-          final bottomPadding = isNewestMessage
-              ? widget.bottomOverlayInset
-              : 0.0;
           final needTopPadding = isOldestMessage && message.user != 1;
           return _ChatMessageListRow(
             key: ValueKey(
@@ -1510,10 +1501,7 @@ class _ChatMessageListState extends State<ChatMessageList> {
             onUserMessageEditCancelled: widget.onUserMessageEditCancelled,
             onUserMessageEditSaved: widget.onUserMessageEditSaved,
             messageListenable: _observableMessages?.listenableAt(dataIndex),
-            padding: EdgeInsets.only(
-              top: needTopPadding ? 24.0 : 0.0,
-              bottom: bottomPadding,
-            ),
+            padding: EdgeInsets.only(top: needTopPadding ? 24.0 : 0.0),
             onBeforeTaskExecute: widget.onBeforeTaskExecute,
             onCancelTask: widget.onCancelTask,
             parentScrollController: widget.scrollController,
@@ -1537,10 +1525,17 @@ class _ChatMessageListState extends State<ChatMessageList> {
       );
     }
 
+    final paddedContent = AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: reservedBottomInset),
+      child: content,
+    );
+
     if (pageBackgroundColor == null) {
-      return content;
+      return paddedContent;
     }
-    return ColoredBox(color: pageBackgroundColor, child: content);
+    return ColoredBox(color: pageBackgroundColor, child: paddedContent);
   }
 }
 
