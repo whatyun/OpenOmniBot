@@ -11,7 +11,9 @@
         volumes:
           - gradle-cache:/root/.gradle:rw
           - pub-cache:/root/.pub-cache:rw
-          - android-sdk:/opt/android-sdk-linux:rw
+          - android-sdk-ndk:/opt/android-sdk-linux/ndk:rw
+          - android-sdk-licenses:/opt/android-sdk-linux/licenses:rw
+          - android-sdk-cmake:/opt/android-sdk-linux/cmake:rw
       env:
         JAVA_VERSION: "17"
         FLUTTER_VERSION: "3.38.7"
@@ -103,7 +105,9 @@ $:
         volumes:
           - gradle-cache:/root/.gradle:rw
           - pub-cache:/root/.pub-cache:rw
-          - android-sdk:/opt/android-sdk-linux:rw
+          - android-sdk-ndk:/opt/android-sdk-linux/ndk:rw
+          - android-sdk-licenses:/opt/android-sdk-linux/licenses:rw
+          - android-sdk-cmake:/opt/android-sdk-linux/cmake:rw
       env:
         JAVA_VERSION: "17"
         FLUTTER_VERSION: "3.38.7"
