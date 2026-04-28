@@ -243,8 +243,8 @@ object OmniInferQnnModelsManager {
         activeDownloads[modelId] = state
         ModelDownloadForegroundService.start(context, activeDownloads.size, resolved.entry.modelName)
 
-        // Calculate initial progress from existing files
-        val savedSize = destDir.walkTopDown().filter { it.isFile && !it.name.endsWith(".part") }.sumOf { it.length() }
+        // Calculate initial progress from existing files (include .part files for resume)
+        val savedSize = destDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
         val totalSize = resolved.entry.fileSize
         val initialProgress = if (totalSize > 0 && savedSize > 0) savedSize.toDouble() / totalSize else 0.0
         emitDownloadUpdate(modelId, downloadInfoMap(
@@ -300,13 +300,17 @@ object OmniInferQnnModelsManager {
 
     suspend fun deleteModel(modelId: String): List<Map<String, Any?>> {
         val context = ensureContext()
-        val installed = scanInstalledModels().firstOrNull { it.modelId == modelId }
-        if (installed != null) {
-            if (getLoadedModelId() == modelId) {
-                OmniInferLocalRuntime.stop()
-            }
-            activeDownloads.remove(modelId)?.cancelled = true
-            File(installed.path).deleteRecursively()
+        // Cancel any active download first
+        activeDownloads.remove(modelId)?.cancelled = true
+        // Stop runtime if this model is loaded
+        if (getLoadedModelId() == modelId) {
+            OmniInferLocalRuntime.stop()
+        }
+        // Delete the model directory directly (handles both complete and partial downloads)
+        val qnnDir = AgentWorkspaceManager.modelsQnnDirectory(context)
+        val modelDir = File(qnnDir, modelId)
+        if (modelDir.exists()) {
+            modelDir.deleteRecursively()
         }
         if (getActiveModelId() == modelId) {
             mmkv.encode(KEY_ACTIVE_MODEL_ID, "")
@@ -363,6 +367,11 @@ object OmniInferQnnModelsManager {
         }
 
         val startByte = if (partFile.exists()) partFile.length() else 0L
+        // Account for already-downloaded bytes in .part file for progress tracking
+        if (startByte > 0) {
+            state.savedSize += startByte
+            state.progress = if (state.totalSize > 0) state.savedSize.toDouble() / state.totalSize else 0.0
+        }
 
         val requestBuilder = Request.Builder().url(url)
         if (startByte > 0) {
@@ -376,13 +385,11 @@ object OmniInferQnnModelsManager {
         }
 
         val body = response.body ?: throw RuntimeException("Empty response body for $url")
-        val outputStream = partFile.outputStream().let { os ->
-            if (startByte > 0) {
-                // Append mode
-                java.io.FileOutputStream(partFile, true)
-            } else {
-                os
-            }
+        val outputStream = if (startByte > 0) {
+            // Append mode for resume
+            java.io.FileOutputStream(partFile, true)
+        } else {
+            java.io.FileOutputStream(partFile)
         }
 
         var lastEmitTime = System.currentTimeMillis()
