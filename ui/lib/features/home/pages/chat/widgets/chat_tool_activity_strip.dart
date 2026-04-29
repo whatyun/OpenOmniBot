@@ -58,6 +58,8 @@ class ChatToolActivityStrip extends StatefulWidget {
     this.suppressSurfaceShadow = false,
     this.onStopToolCall,
     this.runningOnly = false,
+    this.showPreviewThumbnail = true,
+    this.openActiveCardOnTap = false,
   });
 
   final List<ChatMessageModel> messages;
@@ -68,6 +70,8 @@ class ChatToolActivityStrip extends StatefulWidget {
   final bool suppressSurfaceShadow;
   final Future<bool> Function(String taskId, String cardId)? onStopToolCall;
   final bool runningOnly;
+  final bool showPreviewThumbnail;
+  final bool openActiveCardOnTap;
 
   @override
   State<ChatToolActivityStrip> createState() => _ChatToolActivityStripState();
@@ -81,11 +85,15 @@ class _ChatToolActivityStripState extends State<ChatToolActivityStrip> {
 
   bool get _resolvedExpanded => widget.expanded ?? _expanded;
 
-  @override
-  Widget build(BuildContext context) {
-    final cards = widget.runningOnly
+  List<Map<String, dynamic>> _resolvedCards() {
+    return widget.runningOnly
         ? extractRunningAgentToolCards(widget.messages)
         : extractAgentToolCards(widget.messages);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = _resolvedCards();
     final activeCard = resolveActiveAgentToolCard(cards);
     if (activeCard == null) {
       _scheduleExpandedResetIfNeeded();
@@ -100,7 +108,10 @@ class _ChatToolActivityStripState extends State<ChatToolActivityStrip> {
         .toList(growable: false);
     final canExpand = historyCards.isNotEmpty;
     final isExpanded = _resolvedExpanded && canExpand;
-    final activeTranscript = buildAgentToolTranscript(activeCard);
+    final previewVisible = widget.showPreviewThumbnail && !isExpanded;
+    final activeTranscript = previewVisible
+        ? buildAgentToolTranscript(activeCard)
+        : null;
     if (!canExpand && _resolvedExpanded) {
       _scheduleExpandedResetIfNeeded();
     }
@@ -112,11 +123,12 @@ class _ChatToolActivityStripState extends State<ChatToolActivityStrip> {
         _kToolActivityRowHeight + historyHeight + dividerHeight;
     final collapsedOccupiedHeight =
         _kToolActivityRowHeight +
-        _kToolActivityPreviewHeight -
-        _kToolActivityPreviewOverlap;
+        (widget.showPreviewThumbnail
+            ? _kToolActivityPreviewHeight - _kToolActivityPreviewOverlap
+            : 0.0);
     final totalHeight =
         surfaceHeight +
-        (!isExpanded
+        (previewVisible
             ? _kToolActivityPreviewHeight - _kToolActivityPreviewOverlap
             : 0.0);
     final collapsedLeadingInset = math.max(
@@ -146,7 +158,9 @@ class _ChatToolActivityStripState extends State<ChatToolActivityStrip> {
                 expanded: isExpanded,
                 canExpand: canExpand,
                 suppressShadow: widget.suppressSurfaceShadow,
-                leadingInset: isExpanded ? 0 : collapsedLeadingInset,
+                leadingInset: previewVisible ? collapsedLeadingInset : 0,
+                showPreviewCutout: previewVisible,
+                openActiveCardOnTap: widget.openActiveCardOnTap,
                 onToggle: () => _handleExpandedChanged(!isExpanded),
                 onStopToolCall: widget.onStopToolCall == null
                     ? null
@@ -158,35 +172,36 @@ class _ChatToolActivityStripState extends State<ChatToolActivityStrip> {
                 onHistoryPointerEnd: _handleHistoryPointerEnd,
               ),
             ),
-            Positioned(
-              left: 0,
-              top: 0,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) {
-                  final offset = Tween<Offset>(
-                    begin: const Offset(-0.05, 0.12),
-                    end: Offset.zero,
-                  ).animate(animation);
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: offset, child: child),
-                  );
-                },
-                child: isExpanded
-                    ? const SizedBox.shrink(key: ValueKey('hidden-preview'))
-                    : _TerminalThumbnail(
-                        key: kChatToolActivityPreviewKey,
-                        transcript: activeTranscript,
-                        onTap: () => _openCardDetailDialog(
-                          context,
-                          cardData: activeCard,
-                        ),
-                      ),
+            if (widget.showPreviewThumbnail)
+              Positioned(
+                left: 0,
+                top: 0,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final offset = Tween<Offset>(
+                      begin: const Offset(-0.05, 0.12),
+                      end: Offset.zero,
+                    ).animate(animation);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(position: offset, child: child),
+                    );
+                  },
+                  child: previewVisible && activeTranscript != null
+                      ? _TerminalThumbnail(
+                          key: kChatToolActivityPreviewKey,
+                          transcript: activeTranscript,
+                          onTap: () => _openCardDetailDialog(
+                            context,
+                            cardData: activeCard,
+                          ),
+                        )
+                      : const SizedBox.shrink(key: ValueKey('hidden-preview')),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -265,7 +280,7 @@ class _ChatToolActivityStripState extends State<ChatToolActivityStrip> {
     if (pendingCardId == null) {
       return;
     }
-    final cards = extractAgentToolCards(widget.messages);
+    final cards = _resolvedCards();
     Map<String, dynamic>? pendingCard;
     for (final card in cards) {
       if (_cardIdentity(card) == pendingCardId) {
@@ -630,6 +645,8 @@ class _ActivityDrawerSurface extends StatelessWidget {
     required this.canExpand,
     required this.suppressShadow,
     required this.leadingInset,
+    required this.showPreviewCutout,
+    required this.openActiveCardOnTap,
     required this.onToggle,
     required this.isStopPending,
     required this.onStopToolCall,
@@ -645,6 +662,8 @@ class _ActivityDrawerSurface extends StatelessWidget {
   final bool canExpand;
   final bool suppressShadow;
   final double leadingInset;
+  final bool showPreviewCutout;
+  final bool openActiveCardOnTap;
   final VoidCallback onToggle;
   final bool isStopPending;
   final VoidCallback? onStopToolCall;
@@ -675,7 +694,7 @@ class _ActivityDrawerSurface extends StatelessWidget {
       elevation: suppressShadow ? 0 : (expanded ? 8 : 6),
       clipBehavior: Clip.antiAlias,
       clipper: _ActivityDrawerClipper(
-        showPreviewCutout: !expanded,
+        showPreviewCutout: showPreviewCutout,
         bottomReveal: bottomReveal,
       ),
       child: ColoredBox(
@@ -715,7 +734,9 @@ class _ActivityDrawerSurface extends StatelessWidget {
             ToolActivityRow(
               card: activeCard,
               leadingInset: leadingInset,
-              onTap: canExpand ? onToggle : null,
+              onTap: openActiveCardOnTap
+                  ? () => onOpenCard(activeCard)
+                  : (canExpand ? onToggle : null),
               trailing: _supportsToolStop(activeCard) && onStopToolCall != null
                   ? _ToolStopButton(
                       enabled: !isStopPending,

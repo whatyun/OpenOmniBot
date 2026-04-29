@@ -623,12 +623,16 @@ mixin _ChatPageUiMixin on _ChatPageStateBase {
     final runtime = _runtimeForMode(mode);
     final resolvedMessages = runtime?.messages ?? _messagesByMode[mode]!;
     final activeAgentTaskIds = runtime?.activeAgentTaskIds ?? const <String>{};
+    final toolActivitySnapshot = resolveAgentToolActivitySnapshot(
+      List<ChatMessageModel>.from(resolvedMessages),
+      activeTaskIds: activeAgentTaskIds,
+    );
     final showToolActivityStrip =
         mode == _activeMode &&
         _isInputAreaVisible &&
         !_showSlashCommandPanel &&
         !_openClawPanelExpanded &&
-        extractRunningAgentToolCards(resolvedMessages).isNotEmpty;
+        toolActivitySnapshot.messages.isNotEmpty;
     return ChatMessageList(
       messages: resolvedMessages,
       activeAgentTaskIds: activeAgentTaskIds,
@@ -758,7 +762,14 @@ mixin _ChatPageUiMixin on _ChatPageStateBase {
     required bool showSurfaceSwitcher,
     required VoidCallback onMenuTap,
   }) {
-    final toolActivityCards = extractAgentToolCards(_messages);
+    final toolActivitySnapshot = resolveAgentToolActivitySnapshot(
+      List<ChatMessageModel>.from(_messages),
+      activeTaskIds: _activeRuntime?.activeAgentTaskIds ?? const <String>{},
+    );
+    final toolActivityMessages = toolActivitySnapshot.messages;
+    final toolActivityCards = extractAgentToolCards(toolActivityMessages);
+    final isPinnedCompletedToolActivity =
+        toolActivityCards.isNotEmpty && !toolActivitySnapshot.isActiveRun;
     final slashCommandCards =
         _showSlashCommandPanel &&
             !_showModelMentionPanel &&
@@ -975,8 +986,9 @@ mixin _ChatPageUiMixin on _ChatPageStateBase {
             child: _buildNormalSurfaceTransition(
               viewportWidth: constraints.maxWidth,
               child: ChatToolActivityStrip(
-                messages: _messages,
-                runningOnly: true,
+                messages: toolActivityMessages,
+                showPreviewThumbnail: toolActivitySnapshot.isActiveRun,
+                openActiveCardOnTap: isPinnedCompletedToolActivity,
                 anchorRect: overlayAnchor?.rect,
                 onOccupiedHeightChanged: _scheduleToolActivityInsetSync,
                 expanded: _isToolActivityExpanded,

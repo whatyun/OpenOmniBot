@@ -1,11 +1,22 @@
 import 'dart:convert';
 
+import 'package:ui/features/home/pages/chat/utils/agent_run_timeline.dart';
 import 'package:ui/features/home/pages/command_overlay/widgets/cards/terminal_output_utils.dart';
 import 'package:ui/l10n/legacy_text_localizer.dart';
 import 'package:ui/models/chat_message_model.dart';
 
 const String kAgentToolSummaryCardType = 'agent_tool_summary';
 const String kAgentToolTitleField = 'toolTitle';
+
+class AgentToolActivitySnapshot {
+  const AgentToolActivitySnapshot({
+    required this.messages,
+    required this.isActiveRun,
+  });
+
+  final List<ChatMessageModel> messages;
+  final bool isActiveRun;
+}
 
 List<Map<String, dynamic>> extractAgentToolCards(
   List<ChatMessageModel> messages,
@@ -28,6 +39,80 @@ List<Map<String, dynamic>> extractRunningAgentToolCards(
       .toList(growable: false);
 }
 
+List<ChatMessageModel> filterAgentToolMessagesByTaskIds(
+  List<ChatMessageModel> messages,
+  Set<String> taskIds,
+) {
+  final normalizedTaskIds = taskIds
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toSet();
+  if (normalizedTaskIds.isEmpty) {
+    return const <ChatMessageModel>[];
+  }
+  return messages
+      .where((message) {
+        if ((message.cardData?['type'] ?? '').toString() !=
+            kAgentToolSummaryCardType) {
+          return false;
+        }
+        final taskId = resolveAgentToolTaskId(message);
+        return taskId != null && normalizedTaskIds.contains(taskId);
+      })
+      .toList(growable: false);
+}
+
+AgentToolActivitySnapshot resolveAgentToolActivitySnapshot(
+  List<ChatMessageModel> messages, {
+  Set<String> activeTaskIds = const <String>{},
+}) {
+  final activeMessages = filterAgentToolMessagesByTaskIds(
+    messages,
+    activeTaskIds,
+  );
+  if (activeMessages.isNotEmpty) {
+    return AgentToolActivitySnapshot(
+      messages: activeMessages,
+      isActiveRun: true,
+    );
+  }
+  return AgentToolActivitySnapshot(
+    messages: resolveLatestCompletedAgentToolMessages(messages),
+    isActiveRun: false,
+  );
+}
+
+List<ChatMessageModel> resolveLatestCompletedAgentToolMessages(
+  List<ChatMessageModel> messages,
+) {
+  if (messages.isEmpty) {
+    return const <ChatMessageModel>[];
+  }
+  final timelineEntries = buildAgentRunTimelineEntries(messages);
+  if (timelineEntries.isEmpty) {
+    return const <ChatMessageModel>[];
+  }
+  final latestEntry = timelineEntries.first;
+  final group = latestEntry.group;
+  if (group == null || group.toolCount == 0) {
+    return const <ChatMessageModel>[];
+  }
+  return group.processMessagesNewestFirst
+      .where(_isAgentToolSummaryMessage)
+      .toList(growable: false);
+}
+
+String? resolveAgentToolTaskId(ChatMessageModel message) {
+  final fromCard = (message.cardData?['taskId'] ?? '').toString().trim();
+  if (fromCard.isNotEmpty) {
+    return fromCard;
+  }
+  final fromStream = (message.streamMeta?['parentTaskId'] ?? '')
+      .toString()
+      .trim();
+  return fromStream.isEmpty ? null : fromStream;
+}
+
 Map<String, dynamic>? resolveActiveAgentToolCard(
   List<Map<String, dynamic>> cards,
 ) {
@@ -40,6 +125,11 @@ Map<String, dynamic>? resolveActiveAgentToolCard(
     return null;
   }
   return cards.first;
+}
+
+bool _isAgentToolSummaryMessage(ChatMessageModel message) {
+  return (message.cardData?['type'] ?? '').toString() ==
+      kAgentToolSummaryCardType;
 }
 
 String resolveAgentToolTitle(Map<String, dynamic> cardData) {
