@@ -221,6 +221,10 @@ abstract class _ChatPageStateBase extends State<ChatPage>
     ChatPageMode.normal: false,
     ChatPageMode.openclaw: false,
   };
+  final Map<ChatPageMode, Set<String>> _expandedAgentRunTaskIdsByMode = {
+    ChatPageMode.normal: <String>{},
+    ChatPageMode.openclaw: <String>{},
+  };
   final Map<ChatPageMode, double> _inputAreaHeightByMode = {
     ChatPageMode.normal: 0,
     ChatPageMode.openclaw: 0,
@@ -587,6 +591,8 @@ abstract class _ChatPageStateBase extends State<ChatPage>
       _slashCommandExpandedByMode[_activeMode] ?? false;
   bool get _isToolActivityExpanded =>
       _toolActivityExpandedByMode[_activeMode] ?? false;
+  Set<String> _expandedAgentRunTaskIdsForMode(ChatPageMode mode) =>
+      _expandedAgentRunTaskIdsByMode[mode] ?? const <String>{};
   double get _inputAreaHeight => _inputAreaHeightByMode[_activeMode] ?? 0;
   bool get _isAiResponding =>
       _activeRuntime?.isAiResponding ??
@@ -976,6 +982,23 @@ abstract class _ChatPageStateBase extends State<ChatPage>
   String? get _editingUserMessageId => _editingUserMessageIdByMode[_activeMode];
   set _editingUserMessageId(String? value) =>
       _editingUserMessageIdByMode[_activeMode] = value;
+  void _updateExpandedAgentRunTaskIds(ChatPageMode mode, Set<String> taskIds) {
+    final normalizedTaskIds = taskIds
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+    final currentTaskIds = _expandedAgentRunTaskIdsForMode(mode);
+    final hasChanged =
+        currentTaskIds.length != normalizedTaskIds.length ||
+        !currentTaskIds.containsAll(normalizedTaskIds);
+    if (!hasChanged || !mounted) {
+      return;
+    }
+    setState(() {
+      _expandedAgentRunTaskIdsByMode[mode] = normalizedTaskIds;
+    });
+  }
+
   TextEditingController _userMessageEditControllerForMode(ChatPageMode mode) =>
       mode == ChatPageMode.openclaw
       ? _openClawUserMessageEditController

@@ -153,10 +153,63 @@ void main() {
     final snapshot = resolveAgentToolActivitySnapshot(messages);
 
     expect(snapshot.isActiveRun, isFalse);
+    expect(snapshot.taskId, 'task-latest');
     expect(snapshot.messages.map((message) => message.id), [
       'task-latest-tool',
     ]);
   });
+
+  test(
+    'completed tool history stays hidden until the matching run group expands',
+    () {
+      final messages = [
+        ChatMessageModel(
+          id: 'task-latest-text',
+          type: 1,
+          user: 2,
+          content: const {'text': '最终回答', 'id': 'task-latest-text'},
+          streamMeta: const {
+            'parentTaskId': 'task-latest',
+            'kind': 'completed',
+            'isFinal': true,
+            'seq': 4,
+          },
+        ),
+        ChatMessageModel.cardMessage(
+          {
+            'type': 'agent_tool_summary',
+            'taskId': 'task-latest',
+            'status': 'success',
+            'toolTitle': '最新工具',
+          },
+          id: 'task-latest-tool',
+          streamMeta: const {
+            'parentTaskId': 'task-latest',
+            'kind': 'tool_completed',
+            'seq': 3,
+          },
+        ),
+      ];
+
+      final snapshot = resolveAgentToolActivitySnapshot(messages);
+
+      expect(shouldShowAgentToolActivitySnapshot(snapshot), isFalse);
+      expect(
+        shouldShowAgentToolActivitySnapshot(
+          snapshot,
+          expandedTaskIds: const {'task-latest'},
+        ),
+        isTrue,
+      );
+      expect(
+        shouldShowAgentToolActivitySnapshot(
+          snapshot,
+          expandedTaskIds: const {'task-other'},
+        ),
+        isFalse,
+      );
+    },
+  );
 
   test('newer user turn clears pinned tool history from prior agent run', () {
     final messages = [
@@ -259,8 +312,37 @@ void main() {
 
       expect(snapshot.isActiveRun, isTrue);
       expect(snapshot.messages, isEmpty);
+      expect(shouldShowAgentToolActivitySnapshot(snapshot), isFalse);
     },
   );
+
+  test('active tool history remains visible without requiring expansion', () {
+    final messages = [
+      ChatMessageModel.cardMessage(
+        {
+          'type': 'agent_tool_summary',
+          'taskId': 'task-active',
+          'status': 'running',
+          'toolTitle': '运行中工具',
+        },
+        id: 'task-active-tool',
+        streamMeta: const {
+          'parentTaskId': 'task-active',
+          'kind': 'tool_running',
+          'seq': 2,
+        },
+      ),
+    ];
+
+    final snapshot = resolveAgentToolActivitySnapshot(
+      messages,
+      activeTaskIds: const {'task-active'},
+    );
+
+    expect(snapshot.isActiveRun, isTrue);
+    expect(snapshot.taskId, 'task-active');
+    expect(shouldShowAgentToolActivitySnapshot(snapshot), isTrue);
+  });
 
   testWidgets(
     'renders current tool title and expands history without duplicating current item',

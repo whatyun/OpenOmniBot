@@ -564,6 +564,56 @@ void main() {
     expect(find.text('详细思考过程'), findsNothing);
   });
 
+  testWidgets('agent run expansion can be controlled by the parent page', (
+    tester,
+  ) async {
+    final controller = ScrollController();
+    final messages = _buildCompletedAgentRunMessages();
+    Set<String> expandedTaskIds = <String>{};
+    late StateSetter setState;
+
+    await tester.pumpWidget(
+      _buildLocalizedApp(
+        child: StatefulBuilder(
+          builder: (context, stateSetter) {
+            setState = stateSetter;
+            return SizedBox(
+              width: 400,
+              height: 520,
+              child: ChatMessageList(
+                messages: messages,
+                scrollController: controller,
+                expandedAgentRunTaskIds: expandedTaskIds,
+                onExpandedAgentRunTaskIdsChanged: (nextTaskIds) {
+                  setState(() {
+                    expandedTaskIds = nextTaskIds;
+                  });
+                },
+                onBeforeTaskExecute: () async {},
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final summaryToggle = find.byKey(
+      const ValueKey('agent-run-summary-task-1'),
+    );
+    expect(find.text('运行 git status'), findsNothing);
+
+    await tester.tap(summaryToggle);
+    await tester.pumpAndSettle();
+    expect(expandedTaskIds, const {'task-1'});
+    expect(find.text('运行 git status'), findsOneWidget);
+
+    await tester.tap(summaryToggle);
+    await tester.pumpAndSettle();
+    expect(expandedTaskIds, isEmpty);
+    expect(find.text('运行 git status'), findsNothing);
+  });
+
   testWidgets('active agent run remains expanded while task is in flight', (
     tester,
   ) async {

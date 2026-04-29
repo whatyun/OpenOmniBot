@@ -1156,6 +1156,8 @@ class ChatMessageList extends StatefulWidget {
   final Future<void> Function()? onLoadMore;
   final bool hasMore;
   final Set<String> activeAgentTaskIds;
+  final Set<String>? expandedAgentRunTaskIds;
+  final ValueChanged<Set<String>>? onExpandedAgentRunTaskIdsChanged;
   final AppBackgroundVisualProfile visualProfile;
   final AppBackgroundConfig appearanceConfig;
 
@@ -1175,6 +1177,8 @@ class ChatMessageList extends StatefulWidget {
     this.onLoadMore,
     this.hasMore = false,
     this.activeAgentTaskIds = const <String>{},
+    this.expandedAgentRunTaskIds,
+    this.onExpandedAgentRunTaskIdsChanged,
     this.visualProfile = AppBackgroundVisualProfile.defaultProfile,
     this.appearanceConfig = AppBackgroundConfig.defaults,
   });
@@ -1188,11 +1192,14 @@ class _ChatMessageListState extends State<ChatMessageList> {
   bool _autoStickToLatest = true;
   bool _outerScrollWasUserDriven = false;
   bool _isAutoLoadingHistory = false;
-  final Set<String> _expandedAgentRunTaskIds = <String>{};
+  final Set<String> _localExpandedAgentRunTaskIds = <String>{};
   static const double _latestEdgeTolerance = 48.0;
   static const double _manualLatestAttachTolerance = 2.0;
   static const double _historyLoadTriggerExtent = 180.0;
   ObservableChatMessageList? _observableMessages;
+
+  Set<String> get _expandedAgentRunTaskIds =>
+      widget.expandedAgentRunTaskIds ?? _localExpandedAgentRunTaskIds;
 
   @override
   void initState() {
@@ -1333,13 +1340,22 @@ class _ChatMessageListState extends State<ChatMessageList> {
     if (normalizedTaskId.isEmpty) {
       return;
     }
-    setState(() {
-      if (_expandedAgentRunTaskIds.contains(normalizedTaskId)) {
-        _expandedAgentRunTaskIds.remove(normalizedTaskId);
-      } else {
-        _expandedAgentRunTaskIds.add(normalizedTaskId);
-      }
-    });
+    final nextExpandedTaskIds = Set<String>.from(_expandedAgentRunTaskIds);
+    if (nextExpandedTaskIds.contains(normalizedTaskId)) {
+      nextExpandedTaskIds.remove(normalizedTaskId);
+    } else {
+      nextExpandedTaskIds.add(normalizedTaskId);
+    }
+    if (widget.expandedAgentRunTaskIds != null) {
+      widget.onExpandedAgentRunTaskIdsChanged?.call(nextExpandedTaskIds);
+    } else {
+      setState(() {
+        _localExpandedAgentRunTaskIds
+          ..clear()
+          ..addAll(nextExpandedTaskIds);
+      });
+      widget.onExpandedAgentRunTaskIdsChanged?.call(nextExpandedTaskIds);
+    }
     if (_autoStickToLatest) {
       _scheduleStickToLatest();
     }

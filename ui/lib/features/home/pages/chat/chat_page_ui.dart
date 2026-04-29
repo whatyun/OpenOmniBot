@@ -403,6 +403,22 @@ mixin _ChatPageUiMixin on _ChatPageStateBase {
     });
   }
 
+  bool _shouldShowToolActivityStripForMode({
+    required ChatPageMode mode,
+    required AgentToolActivitySnapshot snapshot,
+  }) {
+    if (mode != _activeMode ||
+        !_isInputAreaVisible ||
+        _showSlashCommandPanel ||
+        _openClawPanelExpanded) {
+      return false;
+    }
+    return shouldShowAgentToolActivitySnapshot(
+      snapshot,
+      expandedTaskIds: _expandedAgentRunTaskIdsForMode(mode),
+    );
+  }
+
   void _handleInputAreaHeightChanged(double height) {
     final normalized = height.isFinite ? height : 0.0;
     if ((_inputAreaHeight - normalized).abs() < 0.5) {
@@ -627,15 +643,17 @@ mixin _ChatPageUiMixin on _ChatPageStateBase {
       List<ChatMessageModel>.from(resolvedMessages),
       activeTaskIds: activeAgentTaskIds,
     );
-    final showToolActivityStrip =
-        mode == _activeMode &&
-        _isInputAreaVisible &&
-        !_showSlashCommandPanel &&
-        !_openClawPanelExpanded &&
-        toolActivitySnapshot.messages.isNotEmpty;
+    final showToolActivityStrip = _shouldShowToolActivityStripForMode(
+      mode: mode,
+      snapshot: toolActivitySnapshot,
+    );
     return ChatMessageList(
       messages: resolvedMessages,
       activeAgentTaskIds: activeAgentTaskIds,
+      expandedAgentRunTaskIds: _expandedAgentRunTaskIdsForMode(mode),
+      onExpandedAgentRunTaskIdsChanged: (taskIds) {
+        _updateExpandedAgentRunTaskIds(mode, taskIds);
+      },
       scrollController: _scrollControllerForMode(mode),
       bottomOverlayInset:
           bottomOverlayInset +
@@ -778,11 +796,10 @@ mixin _ChatPageUiMixin on _ChatPageStateBase {
         : const <Map<String, dynamic>>[];
     final showSlashCommandStrip =
         _isInputAreaVisible && slashCommandCards.isNotEmpty;
-    final showToolActivityStrip =
-        _isInputAreaVisible &&
-        toolActivityCards.isNotEmpty &&
-        !_showSlashCommandPanel &&
-        !_openClawPanelExpanded;
+    final showToolActivityStrip = _shouldShowToolActivityStripForMode(
+      mode: _activeMode,
+      snapshot: toolActivitySnapshot,
+    );
     final toolActivityCanExpand = toolActivityCards.length > 1;
     final suppressToolActivitySurfaceShadow =
         _inputFocusNode.hasFocus &&
@@ -806,7 +823,8 @@ mixin _ChatPageUiMixin on _ChatPageStateBase {
         _slashCommandPanelOccupiedHeight > 0) {
       _scheduleSlashCommandOccupiedHeightSync(0);
     }
-    if (!toolActivityCanExpand && _isToolActivityExpanded) {
+    if ((!toolActivityCanExpand || !showToolActivityStrip) &&
+        _isToolActivityExpanded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _setToolActivityExpanded(false);
       });
