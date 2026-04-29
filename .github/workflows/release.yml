@@ -55,7 +55,56 @@ jobs:
           git submodule update --init third_party/omniinfer
           git -C third_party/omniinfer submodule update --init framework/mnn framework/llama.cpp
 
+      - name: Use preinstalled JDK 17 when available
+        id: preinstalled_jdk
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          declare -a CANDIDATES=()
+
+          if [[ -n "${JAVA_HOME_17_X64:-}" ]]; then
+            CANDIDATES+=("${JAVA_HOME_17_X64}")
+          fi
+
+          if [[ -n "${JAVA_HOME_17:-}" ]]; then
+            CANDIDATES+=("${JAVA_HOME_17}")
+          fi
+
+          if command -v java >/dev/null 2>&1; then
+            java_bin="$(readlink -f "$(command -v java)")"
+            CANDIDATES+=("$(cd "$(dirname "${java_bin}")/.." && pwd)")
+          fi
+
+          CANDIDATES+=(
+            "/usr/lib/jvm/temurin-17-jdk-amd64"
+            "/usr/lib/jvm/java-17-openjdk-amd64"
+            "/usr/lib/jvm/jdk-17"
+            "/opt/jdk-17"
+            "/opt/jdk17"
+          )
+
+          for candidate in "${CANDIDATES[@]}"; do
+            if [[ ! -x "${candidate}/bin/java" ]]; then
+              continue
+            fi
+
+            version_output="$("${candidate}/bin/java" -version 2>&1 | head -n 1)"
+            if [[ "${version_output}" == *'version "17'* ]] || [[ "${version_output}" == *' 17.'* ]]; then
+              echo "Using preinstalled JDK 17 from ${candidate}"
+              echo "JAVA_HOME=${candidate}" >> "$GITHUB_ENV"
+              echo "${candidate}/bin" >> "$GITHUB_PATH"
+              echo "found=true" >> "$GITHUB_OUTPUT"
+              "${candidate}/bin/java" -version
+              exit 0
+            fi
+          done
+
+          echo "No preinstalled JDK 17 found on the runner."
+          echo "found=false" >> "$GITHUB_OUTPUT"
+
       - name: Set up JDK 17
+        if: steps.preinstalled_jdk.outputs.found != 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
